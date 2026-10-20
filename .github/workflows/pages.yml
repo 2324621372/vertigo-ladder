@@ -21,13 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci
       - run: npm test
+      - run: npm run build
       - uses: actions/configure-pages@v5
-      - run: |
-          mkdir public
-          cp index.html style.css game3d.css app.js engine.js world.js icon.svg public/
-          cp -r vendor public/
-          touch public/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

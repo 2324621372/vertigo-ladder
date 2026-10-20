@@ -1,3 +1,11 @@
+# 单文件即玩版本
+
+运行 `npm ci` 和 `npm run build`，产物为 `public/index.html`，约 0.58 MB。该 HTML 内嵌 3D 引擎、游戏逻辑、样式和图标，无需 CDN 或额外资源。可复制这个文件给其他电脑直接用支持 WebGL 2 的浏览器打开；手机也可通过 GitHub Pages 链接运行（部分手机文件管理器不允许直接运行本地 HTML）。
+
+打开页面自动进入得分突击模式，短暂准备后开局。手机优先竖屏，左右方向按钮使用 `ontouchstart`、`ontouchend` 和 `ontouchcancel`，跳跃使用 `ontouchstart`，支持双指同时移动和跳跃。菜单由触摸结束事件触发，阻止合成点击重复执行；鼠标和键盘仍可使用。首次触摸后解锁浏览器音频。
+
+点击暂停可调整声音、切换模式或查看纪录。`npm run test:browser` 检查构建后的单文件、自动开局、桌面/移动触控、暂停和资源请求。GitHub Actions 使用 `npm ci`、`npm test`、`npm run build` 后部署 `public`。
+
 # 眩晕天梯 / VERTIGO 3D
 
 根据 `docs/Challenge_Game_Copy_Document.md` 的文案制作的 3D 悬空平台跑酷游戏。使用 Three.js / WebGL 2 实时渲染，包含透视相机、立体角色、平台厚度、星空与深渊。依赖随站点发布，无外部 CDN。

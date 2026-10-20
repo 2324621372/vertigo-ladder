@@ -7,7 +7,7 @@ try { const value = JSON.parse(localStorage.getItem('vertigo-3d-v1')); if (value
 let run = null, paused = false, countdown = 0, feedback = 0, lockedUntil = 0, last = 0, selected = 'attack', ghost = null, startPB = 0, resultHTML = '', replayFrame = 0, replayToken = 0, audio = null, padDown = false, pauseCount = 0, sssChain = 0, rungStart = 0, storageOK = true;
 const canvas = $('arena');
 let world; try { world = new World(canvas); } catch (e) { document.body.insertAdjacentHTML('afterbegin', '<p class=notice>无法启动 3D。请启用浏览器硬件加速，并使用支持 WebGL 2 的浏览器。</p>'); }
-const previewWorld = world ? new World($('preview-3d')) : null, previewRun = new Run({ mode: 'life' });
+let previewWorld = null; const previewRun = new Run({ mode: 'life' });
 const keys = new Set(); let touchAxis = 0;
 function persist() { try { localStorage.setItem('vertigo-3d-v1', JSON.stringify(save)); } catch { storageOK = false; } }
 function initAudio() { const A = window.AudioContext || window.webkitAudioContext; if (!audio && A) audio = new A(); if (audio?.state === 'suspended') audio.resume().catch(() => {}); }
@@ -18,7 +18,7 @@ const close = '<button id="close-modal" class="close" aria-label="关闭">×</bu
 function bindClose() { $('close-modal').onclick = closeModal; }
 function showPage(id) { document.body.dataset.screen = id; for (const page of ['home', 'play', 'records']) $(page).classList.toggle('hidden', page !== id); for (const nav of ['nav-play', 'nav-board', 'nav-records']) $(nav).classList.remove('nav-active'); $(id === 'records' ? 'nav-records' : 'nav-play').classList.add('nav-active'); }
 function title() { return save.rung >= 75 ? '顶点候选人' : save.ghostWins >= 20 ? '无影' : save.sGrades >= 10 ? '锋利' : save.runs >= 100 ? '执着' : save.rung >= 1 ? '攀登者' : '未被证明'; }
-function home() { run = null; paused = false; closeModal(); showPage('home'); $('home-best').textContent = save.best ? fmt(save.best) : '—'; $('home-stage').innerHTML = String(save.rung).padStart(2, '0') + ' <small>阶</small>'; $('home-title').textContent = title(); }
+function home() { run = null; paused = false; closeModal(); showPage('home'); if (world && !previewWorld) previewWorld = new World($('preview-3d')); $('home-best').textContent = save.best ? fmt(save.best) : '—'; $('home-stage').innerHTML = String(save.rung).padStart(2, '0') + ' <small>阶</small>'; $('home-title').textContent = title(); }
 $('modes').innerHTML = MODES.map((m, i) => `<button class="mode-card" data-mode="${m.id}"><div class="mode-top"><span>0${i + 1} / ${m.en}</span><i>${i === 0 ? 'START HERE' : i === 5 ? 'HARDCORE' : '↗'}</i></div><h3>${m.name}</h3><p>${m.desc}</p><span class="arrow">↗</span></button>`).join('');
 document.querySelectorAll('[data-mode]').forEach(el => el.onclick = () => setup(el.dataset.mode));
 function setup(mode) {
@@ -102,4 +102,37 @@ fullscreen.onclick = async () => {
   catch { fullscreen.title = '浏览器未允许全屏，当前已铺满窗口'; }
 };
 document.addEventListener('fullscreenchange', () => { const active = Boolean(document.fullscreenElement); fullscreen.setAttribute('aria-label', active ? '退出全屏' : '进入全屏'); fullscreen.innerHTML = `⛶ <span>${active ? '退出全屏' : '全屏'}</span>`; });
-home(); requestAnimationFrame(frame);
+// Touch controls track each finger independently, so steering and jumping work together.
+const steeringTouches = new Map();
+const originalPause = pause;
+$('pause').onclick = () => {
+  clearTouch(); originalPause();
+  if (paused && !$('pause-modes')) {
+    $('modal-content').insertAdjacentHTML('beforeend', '<button id="pause-modes" class="secondary">切换模式 / 纪录</button><button id="pause-settings" class="secondary">声音与设置</button>');
+    $('pause-modes').onclick = () => { finish(true); home(); };
+    $('pause-settings').onclick = () => { settings(); $('close-modal').onclick = () => { closeModal(); paused = false; $('pause').onclick(); }; };
+  }
+};
+function updateSteering() { touchAxis = Math.sign([...steeringTouches.values()].reduce((sum, value) => sum + value, 0)); }
+for (const [id, value] of [['move-left', -1], ['move-right', 1]]) {
+  const el = $(id);
+  el.onpointerdown = e => { if (e.pointerType !== 'mouse') return; e.preventDefault(); el.setPointerCapture(e.pointerId); touchAxis = value; };
+  el.ontouchstart = e => { e.preventDefault(); initAudio(); for (const touch of e.changedTouches) steeringTouches.set(touch.identifier, value); updateSteering(); };
+  el.ontouchend = el.ontouchcancel = e => { e.preventDefault(); for (const touch of e.changedTouches) steeringTouches.delete(touch.identifier); updateSteering(); };
+  el.onpointerup = el.onpointercancel = e => { if (e.pointerType === 'mouse') touchAxis = 0; };
+}
+$('strike').ontouchstart = e => { e.preventDefault(); hit(); };
+// Menus react on touchend; cancelling the default prevents a second synthetic click.
+let menuTouch = null;
+document.addEventListener('touchstart', e => { const el = e.target.closest('button, a'); if (!el || el.closest('.run-controls')) return; const t = e.changedTouches[0]; menuTouch = { el, id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
+document.addEventListener('touchend', e => {
+  if (!menuTouch) return; const touch = [...e.changedTouches].find(t => t.identifier === menuTouch.id); if (!touch) return;
+  const { el, x, y } = menuTouch; menuTouch = null;
+  if (!el.disabled && el.contains(e.target) && Math.hypot(touch.clientX - x, touch.clientY - y) < 15 && el.onclick) { e.preventDefault(); el.onclick.call(el, e); }
+}, { passive: false });
+document.addEventListener('touchcancel', () => { menuTouch = null; });
+function clearTouch() { steeringTouches.clear(); keys.clear(); touchAxis = 0; }
+window.addEventListener('blur', clearTouch);
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearTouch(); });
+if (world) start({ mode: 'attack', rung: 1, risk: 1 }, save.records[recordKey('attack', 1, 1)]);
+requestAnimationFrame(frame);

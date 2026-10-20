@@ -1,0 +1,11 @@
+html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+.run-controls{touch-action:none;user-select:none;-webkit-user-select:none}
+.run-controls>button{touch-action:none;min-height:64px}
+button,a{touch-action:manipulation}
+@media(max-width:600px) and (orientation:portrait){
+  .run-controls{bottom:calc(24px + env(safe-area-inset-bottom));grid-template-columns:76px minmax(90px,1fr) 76px;gap:12px}
+  .run-controls>button{min-height:76px}
+  .arena-bottom{bottom:calc(120px + env(safe-area-inset-bottom))}
+  .input-note{display:none}
+  #fullscreen{bottom:calc(4px + env(safe-area-inset-bottom))}
+}
