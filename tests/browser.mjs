@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises';
 const base = process.env.TEST_URL || 'http://127.0.0.1:4174/';
 const server = process.env.TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { stdio: 'ignore' });
 await mkdir('test-results', { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, ...(process.env.TEST_PROXY ? { proxy: { server: process.env.TEST_PROXY } } : {}), args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   for (const mobile of [false, true]) {
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 }, isMobile: mobile, hasTouch: mobile });
