@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0c10">
-  <meta name="description" content="眩晕天梯：高精度时机挑战。叠加风险倍率，击败自己的残影。">
+  <meta name="description" content="眩晕天梯：3D 悬空跑酷挑战。叠加风险倍率，击败自己的残影。">
   <title>眩晕天梯 / VERTIGO</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./game3d.css">
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -15,7 +16,7 @@
     <header><a id="brand" href="#" aria-label="眩晕天梯首页"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 5h8l5 16L21 5h8L19 29h-6z" fill="currentColor"/></svg><b>VERTIGO<span>眩晕天梯</span></b></a><nav aria-label="主导航"><button class="nav-active" id="nav-play">攀登</button><button id="nav-board">天梯</button><button id="nav-records">纪录</button><button id="nav-settings" aria-label="设置">设置 <span>↗</span></button></nav><div class="system-status"><i></i> SYSTEM READY</div></header>
     <section id="home">
       <div class="home-grid"><div class="hero-copy"><p class="eyebrow"><span>01 / PRECISION IS SURVIVAL</span><i>HIGH DIFFICULTY</i></p><h1>不登顶，<br>即<span>坠落。</span><sup>®</sup></h1><p class="hero-sub">天梯不在乎你有多努力。<br>每一帧都算数。</p><div class="hero-actions"><button id="quick-start" class="primary">开始攀登 <span>↗</span></button><button id="how" class="text-button">第一次登梯？ <span>操作说明 →</span></button></div><div class="hero-records"><div><span>个人最高分 / PB</span><b id="home-best">—</b></div><div><span>最高抵达</span><b id="home-stage">00 <small>阶</small></b></div><div><span>当前身份</span><b id="home-title" class="identity">未被证明</b></div></div></div>
-      <div class="hero-visual" aria-hidden="true"><div class="visual-top"><span>LIVE SIMULATION</span><span>RISK ×3.0</span></div><div class="visual-grid"></div><div class="decor-ring"><div class="ring-core"><span>THE ONLY WAY</span><strong>UP.</strong><small>容错比自尊心还薄。</small></div><i class="orbit-dot"></i></div><div class="crosshair cross-one">+</div><div class="crosshair cross-two">+</div><div class="visual-bottom"><span>目标锁定 / 第 01 阶</span><span>↑ NO CEILING</span></div><div class="visual-label">一次失误。全盘重来。</div></div></div>
+      <div class="hero-visual" aria-hidden="true"><div class="visual-top"><span>LIVE 3D / WEBGL</span><span>RISK ×3.0</span></div><canvas id="preview-3d" aria-label="3D 悬空天梯预览"></canvas><div class="crosshair cross-one">+</div><div class="crosshair cross-two">+</div><div class="visual-bottom"><span>目标锁定 / 第 01 阶</span><span>↑ NO CEILING</span></div><div class="visual-label">一次失误。全盘重来。</div></div></div>
       <div class="section-heading"><h2>选择你的<span>试炼</span></h2><p>六种方式。一个目的。证明自己。</p><span>SELECT PROTOCOL / 06</span></div>
       <div id="modes" class="mode-grid"></div>
       <footer><span>「差一点」是燃料。烧掉它。</span><span>LOCAL RECORDS <i>/</i> 零安装 · 键鼠 / 触控 / 手柄</span></footer>
@@ -23,8 +24,8 @@
     <section id="play" class="hidden">
       <div class="play-header"><div><p class="eyebrow" id="game-mode">SCORE ATTACK</p><h2 id="game-stage">第 01 阶 <span>地基</span></h2></div><div class="play-header-right"><span id="seed-label"></span><button id="pause" class="square" aria-label="暂停">Ⅱ</button></div></div>
       <div class="arena-layout"><aside class="stat-panel"><p class="eyebrow">CURRENT SCORE</p><strong id="score">0</strong><div class="stat-row"><span>个人纪录</span><b id="pb">—</b></div><div class="stat-row"><span>风险倍率</span><b id="risk" class="lime">×1.0</b></div><div class="stat-row"><span>剩余生命</span><b id="lives">● ● ●</b></div><div class="stat-row"><span>连击</span><b id="combo">×0</b></div><p class="panel-note" id="mode-note"></p></aside>
-      <div class="arena"><div class="arena-top"><span id="phase">准备好了就上</span><span id="timer">05.00</span></div><canvas id="arena" width="600" height="600" tabindex="0" aria-label="旋转光标挑战：光标进入绿色目标弧时点击或按空格"></canvas><div class="hit-message" id="hit-message" role="status" aria-live="polite"></div><div class="arena-bottom"><span id="progress">锁定 0 / 6</span><span id="precision">精度 —</span></div><button id="strike" class="primary strike">锁定 / 出手 <span>SPACE ↗</span></button><p class="input-note">点击圆盘 / 空格 / 手柄 A 出手 <i>·</i> P 暂停</p></div>
-      <aside class="right-panel"><p class="eyebrow">CLIMB PROTOCOL</p><div class="ladder" id="ladder"></div><div class="legend"><span><i class="target-key"></i>命中窗口</span><span><i class="perfect-key"></i>完美中心</span><span><i class="ghost-key"></i>最佳残影</span></div><p class="panel-note" id="ghost-note">操作很简单。<br>时机不简单。</p></aside></div>
+      <div class="arena"><div class="arena-top"><span id="phase">准备好了就上</span><span id="timer">00.00s</span></div><canvas id="arena" width="900" height="650" tabindex="0" aria-label="3D 天梯跑酷：左右移动，空格起跳"></canvas><div class="hit-message" id="hit-message" role="status" aria-live="polite"></div><div class="arena-bottom"><span id="progress">平台 0 / 8</span><span id="precision">精度 —</span></div><div class="run-controls"><button id="move-left" aria-label="向左移动">◀</button><button id="strike" class="primary strike">跳跃 <span>SPACE ↗</span></button><button id="move-right" aria-label="向右移动">▶</button></div><p class="input-note">A D / ← → 移动 · 空格跳跃 <i>·</i> P 暂停</p></div>
+      <aside class="right-panel"><p class="eyebrow">CLIMB PROTOCOL</p><div class="ladder" id="ladder"></div><div class="legend"><span><i class="target-key"></i>悬空平台</span><span><i class="perfect-key"></i>最佳落点</span><span><i class="ghost-key"></i>最佳残影</span></div><p class="panel-note" id="ghost-note">操作很简单。<br>时机不简单。</p></aside></div>
     </section>
     <section id="records" class="hidden content-page"></section>
   </main>

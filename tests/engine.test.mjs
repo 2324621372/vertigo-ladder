@@ -1,18 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Run, CONFIG, angleDiff, TAU, dateKey, weekKey, recordKey, tier } from '../engine.js';
-const perfectHit = run => { run.angle = run.target; return run.strike(); };
-test('angle difference wraps correctly at zero', () => { assert.ok(Math.abs(angleDiff(.01, TAU - .01) - .02) < 1e-9); });
-test('center hits are perfect and total equals displayed breakdown', () => { const r = new Run({ risk: 3 }); perfectHit(r); assert.equal(r.perfects, 1); assert.equal(r.combo, 1); const p = r.parts; assert.equal(r.score, (p.base + p.time + p.precision) * 3 + p.style + p.sustain); });
-test('boundary is accepted, outside is a miss', () => { const r = new Run(); r.angle = r.target + r.width / 2; assert.equal(r.strike().hit, true); r.angle = r.target + r.width / 2 + .001; assert.equal(r.strike().hit, false); assert.equal(r.lives, 2); assert.equal(r.combo, 0); });
-test('three misses terminate attack; further inputs ignored', () => { const r = new Run(); for (let i = 0; i < 3; i++) { r.angle = r.target + Math.PI; r.strike(); } assert.equal(r.over, true); assert.equal(r.won, false); assert.equal(r.strike(), null); });
-test('five seconds without input spends one life and retargets', () => { const r = new Run(); for (let i = 0; i < 51; i++) r.tick(.1); assert.equal(r.misses, 1); assert.equal(r.lastMiss.reason, 'timeout'); assert.ok(r.targetTime < .2); });
-test('attack and ghost require eight hits in selected stage', () => { for (const mode of ['attack', 'ghost']) { const r = new Run({ mode, rung: 47 }); for (let i = 0; i < 8; i++) perfectHit(r); assert.equal(r.won, true); assert.equal(r.rung, 47); assert.equal(r.perfect, true); assert.equal(r.grade, 'SSS'); } });
-test('trial has ten stages with shared lives', () => { const r = new Run({ mode: 'trial' }); for (let i = 0; i < 59; i++) perfectHit(r); assert.equal(r.over, false); perfectHit(r); assert.equal(r.completed, 10); assert.equal(r.rung, 10); assert.equal(r.won, true); assert.equal(r.lives, 3); });
-test('life and iron terminate after one mistake', () => { for (const mode of ['life', 'iron']) { const r = new Run({ mode }); r.angle = r.target + Math.PI; r.strike(); assert.equal(r.over, true); assert.equal(r.lives, 0); } });
-test('weekly and daily have reproducible targets independent of external seed', () => { for (const mode of ['weekly', 'iron']) { const a = new Run({ mode, date: '2026-10-20', week: '2026-10-19', seed: 1 }), b = new Run({ mode, date: '2026-10-20', week: '2026-10-19', seed: 99 }); for (let i = 0; i < 15; i++) { assert.equal(a.target, b.target); perfectHit(a); perfectHit(b); } } });
-test('risk narrows windows and increases speed; high stages are bounded', () => { const a = new Run(), b = new Run({ risk: 3, rung: 120 }); assert.ok(b.width < a.width); assert.ok(b.speed > a.speed); assert.ok(b.width > 0); for (let i = 0; i < 8; i++) perfectHit(b); assert.equal(b.grade, 'V'); });
-test('endless mode ends at 120 stages with complete result', () => { const r = new Run({ mode: 'life' }); for (let i = 0; i < 120 * 6; i++) perfectHit(r); assert.equal(r.won, true); assert.equal(r.rung, 120); assert.equal(r.completed, 120); });
-test('calendar date and Monday week keys work across year boundaries', () => { assert.equal(dateKey(new Date(2026, 9, 20)), '2026-10-20'); assert.equal(weekKey(new Date(2026, 9, 25)), '2026-10-19'); assert.equal(weekKey(new Date(2026, 0, 1)), '2025-12-29'); });
-test('record rules separate risk and weeks, ghost shares attack record', () => { assert.equal(recordKey('ghost', 5, 2), recordKey('attack', 5, 2)); assert.notEqual(recordKey('attack', 5, 1), recordKey('attack', 5, 3)); assert.notEqual(recordKey('weekly', 1, 2, 'a'), recordKey('weekly', 1, 2, 'b')); });
-test('tiers follow source document', () => { assert.equal(tier(1), '地基'); assert.equal(tier(11), '高压'); assert.equal(tier(26), '碎裂'); assert.equal(tier(51), '眩晕'); assert.equal(tier(76), '顶点'); assert.equal(tier(101), '彼岸'); assert.equal(CONFIG.trialRungs, 10); });
+import { Run, recordKey } from '../engine.js';
+function auto(run) {
+  for (let i = 0; i < 30000 && !run.over; i++) {
+    const p = run.player, current = run.platforms[run.checkpoint], next = run.platforms[run.checkpoint + 1];
+    const obstacle = current.obstacle && p.z > current.z - .6 ? current : next.obstacle ? next : null;
+    const target = obstacle ? run.platformX(obstacle) + obstacle.width * .4 : run.platformX(next);
+    run.input = Math.max(-1, Math.min(1, (target - p.x) * 5));
+    if (p.grounded && p.z < current.z - current.length / 2 + 1.15) run.jump();
+    run.tick(1 / 120);
+  }
+  return run;
+}
+test('jump is physical and disallows second jump', () => { const r = new Run(); assert.ok(r.jump()); assert.equal(r.jump(), false); r.tick(.1); assert.ok(r.player.y > 0); assert.ok(r.player.z < .5); });
+test('no jump causes fall and respawn', () => { const r = new Run(); for (let i = 0; i < 400 && !r.misses; i++) r.tick(.016); assert.equal(r.misses, 1); assert.equal(r.lives, 2); assert.equal(r.player.grounded, true); });
+test('one life ends on fall', () => { const r = new Run({ mode: 'life' }); for (let i = 0; i < 500 && !r.over; i++) r.tick(.016); assert.equal(r.over, true); assert.equal(r.lives, 0); });
+test('weekly course is reproducible', () => { assert.deepEqual(new Run({ mode: 'weekly', week: '2026-10-19' }).platforms, new Run({ mode: 'weekly', week: '2026-10-19' }).platforms); });
+test('risk narrows platforms and increases speed', () => { const a = new Run(), b = new Run({ risk: 3 }); assert.ok(b.speed > a.speed); assert.ok(b.platforms[1].width < a.platforms[1].width); });
+test('eight platforms reachable using actual physics', () => { const r = auto(new Run()); assert.equal(r.won, true, JSON.stringify({ hits: r.hits, misses: r.misses, last: r.lastMiss })); assert.equal(r.hits, 8); assert.ok(r.score > 0); assert.ok(r.frames.length); });
+test('trial can be completed using actual physics', () => { const r = auto(new Run({ mode: 'trial' })); assert.ok(r.won, JSON.stringify(r.lastMiss)); assert.equal(r.completed, 10); });
+test('moving obstacle costs life', () => { const r = new Run(); const p = r.platforms[3]; r.checkpoint = 3; r.support = 3; r.player = { x: r.platformX(p) + Math.sin(.001 * 2 + p.phase) * p.width * .23, y: p.y, z: p.z, vy: 0, grounded: true }; assert.equal(r.tick(.001)?.reason, 'obstacle'); });
+test('3D records separate and ghost shares attack record', () => { assert.ok(recordKey('attack', 1, 1).startsWith('3d:')); assert.equal(recordKey('attack', 1, 1), recordKey('ghost', 1, 1)); });
+test('completed runs cannot advance', () => { const r = new Run(); r.over = true; assert.equal(r.tick(.1), null); assert.equal(r.jump(), false); assert.equal(r.elapsed, 0); });
