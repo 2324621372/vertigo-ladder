@@ -20,7 +20,7 @@ try {
     await page.goto(url);
     await page.waitForFunction(() => document.body.dataset.screen === 'play' && document.querySelector('#arena').dataset.renderer === 'webgl-3d');
     assert.equal(await page.locator('#modal').evaluate(el => el.open), false);
-    assert.ok(await page.locator('#home').evaluate(el => el.classList.contains('hidden')));
+    assert.equal(await page.locator('#home').count(), 0);
     await page.waitForFunction(() => parseFloat(document.querySelector('#timer').textContent) > .1);
     assert.ok(await page.evaluate(() => { const r = document.querySelector('#arena').getBoundingClientRect(); return Math.abs(r.width - innerWidth) < 2 && Math.abs(r.height - innerHeight) < 2; }));
     if (mobile) {
@@ -32,7 +32,8 @@ try {
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...left, id: 0 }, { ...jump, id: 1 }] });
       await page.waitForTimeout(120);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await page.locator('#pause').tap();
+      // Attaching CDP can blur the window and trigger the game's automatic pause.
+      if (!await page.locator('#modal').evaluate(el => el.open)) await page.locator('#pause').tap();
     } else { await page.keyboard.press('Space'); await page.locator('#pause').click(); }
     await page.locator('#resume').waitFor();
     const timer = await page.locator('#timer').innerText(); await page.waitForTimeout(150); assert.equal(await page.locator('#timer').innerText(), timer);
