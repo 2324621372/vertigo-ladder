@@ -16,7 +16,7 @@ function modal(html) { replayToken++; cancelAnimationFrame(replayFrame); $('moda
 function closeModal() { replayToken++; cancelAnimationFrame(replayFrame); $('modal').close(); }
 const close = '<button id="close-modal" class="close" aria-label="关闭">×</button>';
 function bindClose() { $('close-modal').onclick = closeModal; }
-function showPage(id) { for (const page of ['home', 'play', 'records']) $(page).classList.toggle('hidden', page !== id); for (const nav of ['nav-play', 'nav-board', 'nav-records']) $(nav).classList.remove('nav-active'); $(id === 'records' ? 'nav-records' : 'nav-play').classList.add('nav-active'); }
+function showPage(id) { document.body.dataset.screen = id; for (const page of ['home', 'play', 'records']) $(page).classList.toggle('hidden', page !== id); for (const nav of ['nav-play', 'nav-board', 'nav-records']) $(nav).classList.remove('nav-active'); $(id === 'records' ? 'nav-records' : 'nav-play').classList.add('nav-active'); }
 function title() { return save.rung >= 75 ? '顶点候选人' : save.ghostWins >= 20 ? '无影' : save.sGrades >= 10 ? '锋利' : save.runs >= 100 ? '执着' : save.rung >= 1 ? '攀登者' : '未被证明'; }
 function home() { run = null; paused = false; closeModal(); showPage('home'); $('home-best').textContent = save.best ? fmt(save.best) : '—'; $('home-stage').innerHTML = String(save.rung).padStart(2, '0') + ' <small>阶</small>'; $('home-title').textContent = title(); }
 $('modes').innerHTML = MODES.map((m, i) => `<button class="mode-card" data-mode="${m.id}"><div class="mode-top"><span>0${i + 1} / ${m.en}</span><i>${i === 0 ? 'START HERE' : i === 5 ? 'HARDCORE' : '↗'}</i></div><h3>${m.name}</h3><p>${m.desc}</p><span class="arrow">↗</span></button>`).join('');
@@ -95,4 +95,11 @@ document.addEventListener('keyup', e => keys.delete(e.key.toLowerCase().startsWi
 document.addEventListener('keydown', e => { if (['ArrowLeft','ArrowRight','a','d','A','D'].includes(e.key)) { if (run && !$('modal').open) e.preventDefault(); keys.add(e.key.startsWith('Arrow') ? e.key : e.key.toLowerCase()); } if (!run || run.over) return; if ($('modal').open) { if (paused && ['Escape', 'p', 'P'].includes(e.key)) { e.preventDefault(); resume(); } return; } if (e.repeat) return; if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); hit(); } if (['p', 'P', 'Escape'].includes(e.key)) { e.preventDefault(); pause(); } });
 $('modal').addEventListener('cancel', e => { if (paused) { e.preventDefault(); resume(); } else if (run?.over) { e.preventDefault(); if ($('back-result')) result(); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { pause(); audio?.suspend(); } }); window.addEventListener('blur', () => { if (run && !run.over) pause(); });
+const fullscreen = $('fullscreen');
+if (!document.fullscreenEnabled) fullscreen.hidden = true;
+fullscreen.onclick = async () => {
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }
+  catch { fullscreen.title = '浏览器未允许全屏，当前已铺满窗口'; }
+};
+document.addEventListener('fullscreenchange', () => { const active = Boolean(document.fullscreenElement); fullscreen.setAttribute('aria-label', active ? '退出全屏' : '进入全屏'); fullscreen.innerHTML = `⛶ <span>${active ? '退出全屏' : '全屏'}</span>`; });
 home(); requestAnimationFrame(frame);
