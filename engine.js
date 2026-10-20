@@ -27,16 +27,18 @@ export class Run {
       this.platforms.push({ index: i, x: Math.max(-2.3, Math.min(2.3, prev.x + (this.random() - .5) * 1.7)), y: i * .42, z: prev.z - 6.4, width: Math.max(1.55, 3.5 - difficulty - (this.risk - 1) * .35), length: 4.8, motion: i > 3 && i % 4 === 0 ? .35 + difficulty * .25 : 0, phase: this.random() * Math.PI * 2, obstacle: i > 2 && i % 3 === 0 });
     }
     this.elapsed = 0; this.targetTime = 0; this.hits = 0; this.rungHits = 0; this.perfects = 0; this.misses = 0; this.combo = 0; this.maxCombo = 0; this.completed = 0; this.lives = ['life', 'iron'].includes(mode) ? 1 : 3;
+    this.gems = 0; this.shield = false; this.jumpBuffer = 0; this.coyote = 0; this.invincible = 0;
     this.parts = { base: 0, time: 0, precision: 0, style: 0, sustain: 0 }; this.trace = []; this.frames = []; this.events = []; this.lastMiss = null; this.over = false; this.won = false; this.checkpoint = 0; this.input = 0; this.sampleTime = 0; this.resetPlayer();
+    for (const p of this.platforms) { p.gem = p.index > 0 && p.index <= this.total; p.gemOffset = p.obstacle ? -p.width * .3 : p.index % 2 ? p.width * .22 : -p.width * .22; }
   }
   platformX(p) { return p.x + Math.sin(this.elapsed * 1.4 + p.phase) * p.motion; }
-  resetPlayer() { const p = this.platforms[this.checkpoint]; this.player = { x: this.platformX(p), y: p.y, z: p.z + (p.obstacle ? 1.8 : .5), vy: 0, grounded: true }; this.support = p.index; this.input = 0; }
+  resetPlayer() { const p = this.platforms[this.checkpoint]; this.player = { x: this.platformX(p), y: p.y, z: p.z + .5, vy: 0, grounded: true }; this.support = p.index; this.input = 0; this.jumpBuffer = 0; this.coyote = 0; this.invincible = 1; }
   get speed() { return 5.3 + (this.risk - 1) * .5 + Math.min(1.2, (this.startRung + this.hits - 1) * .012); }
   get score() { const p = this.parts; return Math.round((p.base + p.time + p.precision) * this.risk + p.style + p.sustain); }
   get accuracy() { return this.hits ? this.trace.filter(e => e.hit).reduce((n, e) => n + e.accuracy, 0) / this.hits : 0; }
   get perfect() { return this.won && !this.misses && this.perfects === this.hits; }
   get grade() { const a = this.accuracy; return !this.hits ? 'D' : this.perfect && this.startRung >= 76 ? 'V' : a >= .94 && !this.misses ? 'SSS' : a >= .85 && !this.misses ? 'SS' : a >= .72 && this.misses <= 1 ? 'S' : a >= .6 ? 'A' : a >= .4 ? 'B' : 'C'; }
-  jump() { if (this.over || !this.player.grounded) return false; this.player.vy = CONFIG.jumpVelocity; this.player.grounded = false; this.support = -1; return true; }
+  jump() { if (this.over) return false; if (!this.player.grounded && this.coyote <= 0) { this.jumpBuffer = .14; return false; } this.jumpBuffer = 0; this.coyote = 0; this.player.vy = CONFIG.jumpVelocity; this.player.grounded = false; this.support = -1; return true; }
   tick(dt) {
     if (this.over) return null;
     // Fixed substeps prevent tunnelling through narrow platforms at low frame rates.
@@ -46,12 +48,22 @@ export class Run {
   }
   step(dt) {
     this.elapsed += dt; this.targetTime += dt; const p = this.player, oldY = p.y;
+    this.jumpBuffer = Math.max(0, this.jumpBuffer - dt); this.coyote = Math.max(0, this.coyote - dt); this.invincible = Math.max(0, this.invincible - dt);
+    if (p.grounded && this.jumpBuffer > 0) this.jump();
     p.x += Math.max(-1, Math.min(1, this.input)) * 4.8 * dt; p.z -= this.speed * dt;
-    if (p.grounded) { const support = this.platforms[this.support]; if (!support || Math.abs(p.x - this.platformX(support)) > support.width / 2 + .1 || Math.abs(p.z - support.z) > support.length / 2 + .1) { p.grounded = false; p.vy = 0; } }
+    if (p.grounded) { const support = this.platforms[this.support]; if (!support || Math.abs(p.x - this.platformX(support)) > support.width / 2 + .1 || Math.abs(p.z - support.z) > support.length / 2 + .1) { p.grounded = false; p.vy = 0; this.coyote = .1; } }
     if (!p.grounded) { p.vy -= CONFIG.gravity * dt; p.y += p.vy * dt;
       if (p.vy <= 0) for (const platform of this.platforms) { if (platform.index < this.checkpoint) continue; if (oldY >= platform.y - .02 && p.y <= platform.y && Math.abs(p.x - this.platformX(platform)) <= platform.width / 2 && Math.abs(p.z - platform.z) <= platform.length / 2) { p.y = platform.y; p.vy = 0; p.grounded = true; this.support = platform.index; if (platform.index > this.checkpoint) return this.land(platform); break; } }
     }
-    for (const platform of this.platforms) { if (!platform.obstacle || Math.abs(p.z - platform.z) > .45 || Math.abs(p.y - platform.y) > .65) continue; const ox = this.platformX(platform) + Math.sin(this.elapsed * 2 + platform.phase) * platform.width * .23; if (Math.abs(p.x - ox) < .48) return this.miss('obstacle'); }
+    for (const platform of this.platforms) {
+      if (platform.gem && Math.abs(p.z - platform.z) < .65 && Math.abs(p.y - platform.y) < 1.6 && Math.abs(p.x - this.platformX(platform) - platform.gemOffset) < .65) {
+        platform.gem = false; this.gems++; this.parts.style += 150; if (this.gems % 3 === 0) this.shield = true;
+        this.events.push({ type: 'gem', shield: this.gems % 3 === 0 });
+      }
+      if (!platform.obstacle || this.invincible > 0 || Math.abs(p.z - platform.z) > .45 || Math.abs(p.y - platform.y) > .65) continue;
+      const ox = this.platformX(platform) + Math.sin(this.elapsed * 2 + platform.phase) * platform.width * .23;
+      if (Math.abs(p.x - ox) < .48) { if (this.shield) { this.shield = false; this.invincible = 1; this.events.push({ type: 'shield' }); } else return this.miss('obstacle'); }
+    }
     const floor = this.platforms[this.checkpoint].y;
     if (p.y < floor - 5 || Math.abs(p.x) > 9) return this.miss('fall');
     this.sampleTime += dt; if (this.sampleTime >= .08) { this.sampleTime = 0; this.frames.push({ time: this.elapsed, x: p.x, y: p.y, z: p.z }); }

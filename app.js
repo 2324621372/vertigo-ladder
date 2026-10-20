@@ -1,5 +1,5 @@
 import { Run, MODES, CONFIG, dateKey, weekKey, recordKey, tier } from './engine.js';
-import { World } from './world.js';
+import { World } from './scenery.js';
 const $ = id => document.getElementById(id), fmt = n => Number(n || 0).toLocaleString('en-US');
 const blank = () => ({ best: 0, rung: 0, runs: 0, perfects: 0, sGrades: 0, ghostWins: 0, records: {}, history: [], iron: {}, badges: [], attempts: {}, settings: { sound: true, vibration: true, reduced: false } });
 let save = blank();
@@ -47,6 +47,17 @@ function hud() {
   const ghostHits = ghost?.trace?.filter(e => e.hit && e.time <= run.elapsed).length || 0; $('ghost-note').textContent = ghost ? `最佳残影：${ghostHits} 次命中 / ${ghost.elapsed.toFixed(2)}s\n当前：${run.hits} 次命中 / ${run.elapsed.toFixed(2)}s` : '操作很简单。\n时机不简单。';
 }
 function hit() { if (!run || run.over || paused || countdown > 0 || $('modal').open) return; initAudio(); run.jump(); }
+function trailHUD() {
+  if (!run) return;
+  const platform = run.platforms[run.checkpoint], distance = run.player.z - (platform.z - platform.length / 2);
+  const hint = $('trail-hint'), ready = run.player.grounded && distance < 1.5 && distance > .1;
+  hint.classList.toggle('ready', ready);
+  hint.textContent = countdown > 0 ? `准备 ${Math.ceil(countdown)} · 左右移动，点击跳跃` : run.over ? (run.won ? '抵达终点！' : '再试一次，找到节奏') : ready ? '现在跳！ ↑' : run.checkpoint < 2 ? '金色线附近起跳 · 空中可左右调整' : run.platforms[run.checkpoint + 1]?.motion ? '前方移动浮岛 · 对准落点' : '青色晶体 +150 · 绕开珊瑚色障碍';
+  $('gem-status').innerHTML = `◆ ${run.gems} <span>${run.shield ? '护盾就绪 · 可抵挡一次障碍' : `再收集 ${3 - run.gems % 3} 颗获得护盾`}</span>`;
+  $('run-progress').firstElementChild.style.width = `${run.completed / run.total * 100}%`;
+  const event = run.events.shift();
+  if (event) { feedback = performance.now() + 850; $('hit-message').textContent = event.type === 'shield' ? '护盾抵挡！' : event.shield ? '护盾就绪！' : '◆ +150'; $('hit-message').style.color = '#d8fff0'; $('hit-message').style.opacity = '1'; beep(true, true); }
+}
 function handle(event) {
   if (!event) return; lockedUntil = 0; feedback = performance.now() + 650;
   $('hit-message').textContent = event.hit ? event.perfect ? 'PERFECT' : 'LANDED' : event.reason === 'obstacle' ? '撞上障碍' : '坠落深渊'; $('hit-message').style.color = event.hit ? 'var(--lime)' : 'var(--red)'; $('hit-message').style.opacity = '1'; beep(event.hit, event.perfect); if (save.settings.vibration && navigator.vibrate) navigator.vibrate(event.hit ? 12 : 65);
@@ -92,7 +103,7 @@ function records(weekly = false) {
 }
 function draw(now, dt) { if (run && world) world.render(run, ghost, dt); }
 function gamepad() { const pad = navigator.getGamepads?.()?.find(p => p?.connected); const pressed = Boolean(pad?.buttons[0]?.pressed); if (pressed && !padDown) hit(); padDown = pressed; return Math.abs(pad?.axes[0] || 0) > .15 ? pad.axes[0] : 0; }
-function frame(now) { const dt = Math.min(.05, Math.max(0, (now - (last || now)) / 1000)); last = now; if (run && !run.over && !paused && !$('modal').open) { const axis = gamepad(); run.input = touchAxis || axis || ((keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0)); if (countdown > 0) countdown = Math.max(0, countdown - dt); else handle(run.tick(dt)); hud(); } draw(now, dt); if (now > feedback) $('hit-message').style.opacity = '0'; requestAnimationFrame(frame); }
+function frame(now) { const dt = Math.min(.05, Math.max(0, (now - (last || now)) / 1000)); last = now; if (run && !run.over && !paused && !$('modal').open) { const axis = gamepad(); run.input = touchAxis || axis || ((keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0)); if (countdown > 0) countdown = Math.max(0, countdown - dt); else handle(run.tick(dt)); hud(); } trailHUD(); draw(now, dt); if (now > feedback) $('hit-message').style.opacity = '0'; requestAnimationFrame(frame); }
 function navigate(fn) { if (run && !run.over) pause(); else { closeModal(); fn(); } }
 $('nav-play').onclick = () => navigate(home); $('nav-board').onclick = () => navigate(() => records(true)); $('nav-records').onclick = () => navigate(() => records()); $('nav-settings').onclick = () => navigate(settings); $('brand').onclick = e => { e.preventDefault(); navigate(home); }; $('pause').onclick = pause; $('strike').onclick = hit; for (const [id, value] of [['move-left', -1], ['move-right', 1]]) { const el = $(id); el.onpointerdown = e => { e.preventDefault(); el.setPointerCapture(e.pointerId); touchAxis = value; }; el.onpointerup = el.onpointercancel = () => { touchAxis = 0; }; }
 document.addEventListener('keyup', e => keys.delete(e.key.toLowerCase().startsWith('arrow') ? e.key : e.key.toLowerCase()));

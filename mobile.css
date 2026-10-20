@@ -1,4 +1,19 @@
 html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+body{--lime:#80efce;--red:#ff9a88}
+.play-header h2{text-shadow:0 2px 10px #183c5255}
+.play-header h2 span,.stat-panel .stat-row span,.arena-bottom{color:#e7fff6}.arena-top{color:#effff7}
+.stat-panel,.arena-top,#pause{background:#153f53ba;border-color:#eaffff30}
+.run-controls>button{border:1px solid #ffffff77;box-shadow:0 6px 22px #163c5340;border-radius:22px;background:#17465bd9}
+.run-controls .strike{background:#9cf1d5;color:#123d47;border-color:#d8fff0}
+.run-controls>button:active{transform:translateY(3px);background:#e8c785;color:#183944}
+#trail-hint{position:fixed;top:205px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap;padding:9px 16px;border-radius:24px;background:#173e54bd;color:#fff6e6;font-size:12px;pointer-events:none;transition:background .2s}
+#trail-hint.ready{background:#ffe1a6;color:#433825;box-shadow:0 0 25px #ffdf9b55}
+#gem-status{position:fixed;bottom:155px;left:22px;z-index:3;color:#eafff4;background:#17495bb8;padding:8px 12px;border-radius:14px;font-size:15px;pointer-events:none}
+#gem-status span{font-size:10px;display:block;opacity:.8;margin-top:3px}
+#run-progress{position:fixed;top:0;left:0;right:0;height:4px;background:#ffffff25;z-index:6;pointer-events:none}
+#run-progress i{display:block;height:100%;background:#9cf1d5;width:0;transition:width .3s}
+body:not([data-screen=play]) #trail-hint,body:not([data-screen=play]) #gem-status{display:none}
+@media(min-width:761px){#trail-hint{top:100px}#gem-status{bottom:90px}}
 .run-controls{touch-action:none;user-select:none;-webkit-user-select:none}
 .run-controls>button{touch-action:none;min-height:64px}
 button,a{touch-action:manipulation}
